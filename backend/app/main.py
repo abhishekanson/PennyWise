@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from .database import Base, engine
 from . import models
-
+from .routers import auth
 
 Base.metadata.create_all(bind=engine)
 
@@ -11,6 +11,9 @@ app = FastAPI(
     description="AI Personal Finance Advisor API",
     version="1.0.0"
 )
+
+
+app.include_router(auth.router)
 
 
 @app.get("/")
