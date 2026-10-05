@@ -54,3 +54,38 @@ class TransactionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class BudgetCreate(BaseModel):
+    category: str
+    amount: float
+    month: str
+
+
+class BudgetResponse(BaseModel):
+    id: int
+    user_id: int
+    category: str
+    amount: float
+    month: str
+
+    class Config:
+        from_attributes = True
+
+
+class SavingsGoalCreate(BaseModel):
+    goal_name: str
+    target_amount: float
+    current_amount: float = 0
+    target_date: Optional[date] = None
+
+
+class SavingsGoalResponse(BaseModel):
+    id: int
+    user_id: int
+    goal_name: str
+    target_amount: float
+    current_amount: float
+    target_date: Optional[date]
+
+    class Config:
+        from_attributes = True
