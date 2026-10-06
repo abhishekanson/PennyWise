@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
 import SavingsGoals from "./pages/SavingsGoals";
+import ImportStatement from "./pages/ImportStatement";
 
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -47,6 +48,11 @@ function App() {
             <Route
               path="/savings-goals"
               element={<SavingsGoals />}
+            />
+
+            <Route
+              path="/import-statement"
+              element={<ImportStatement />}
             />
 
           </Route>

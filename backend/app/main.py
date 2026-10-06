@@ -9,7 +9,8 @@ from .routers import (
     budgets,
     savings_goals,
     analysis,
-    ai
+    ai,
+    imports
 )
 
 Base.metadata.create_all(bind=engine)
@@ -34,6 +35,7 @@ app.include_router(budgets.router)
 app.include_router(savings_goals.router)
 app.include_router(analysis.router)
 app.include_router(ai.router)
+app.include_router(imports.router)
 
 
 @app.get("/")

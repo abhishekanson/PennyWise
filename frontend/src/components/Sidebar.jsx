@@ -48,6 +48,14 @@ function Sidebar() {
         </NavLink>
 
         <NavLink
+          to="/import-statement"
+          className={navClass}
+        >
+          <span className="sidebar-icon">↑</span>
+          <span>Import Statement</span>
+        </NavLink>
+
+        <NavLink
           to="/budgets"
           className={navClass}
         >
