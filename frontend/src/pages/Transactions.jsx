@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import API from "../api";
 
 function Transactions() {
@@ -23,6 +23,19 @@ function Transactions() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [sortBy, setSortBy] = useState("date_desc");
 
   const fetchTransactions = async () => {
     try {
@@ -50,51 +63,51 @@ function Transactions() {
   };
 
   const handleAICategorization = async () => {
-  if (!form.description && !form.merchant) {
-    setError(
-      "Enter a description or merchant first."
-    );
-    return;
-  }
+    if (!form.description && !form.merchant) {
+      setError(
+        "Enter a description or merchant first."
+      );
+      return;
+    }
 
-  try {
-    setCategorizing(true);
-    setError("");
-    setSuccess("");
+    try {
+      setCategorizing(true);
+      setError("");
+      setSuccess("");
 
-    const text = [
-      form.description,
-      form.merchant,
-    ]
-      .filter(Boolean)
-      .join(" ");
+      const text = [
+        form.description,
+        form.merchant,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-    const response = await API.post(
-      "/ai/categorize",
-      {
-        description: text,
-      }
-    );
+      const response = await API.post(
+        "/ai/categorize",
+        {
+          description: text,
+        }
+      );
 
-    setForm({
-      ...form,
-      category: response.data.category,
-    });
+      setForm({
+        ...form,
+        category: response.data.category,
+      });
 
-    setSuccess(
-      `AI suggested: ${response.data.category} (${response.data.confidence}% confidence)`
-    );
-  } catch (error) {
-    console.error(error);
+      setSuccess(
+        `AI suggested: ${response.data.category} (${response.data.confidence}% confidence)`
+      );
+    } catch (error) {
+      console.error(error);
 
-    setError(
-      error.response?.data?.detail ||
-        "AI categorization failed"
-    );
-  } finally {
-    setCategorizing(false);
-  }
-};
+      setError(
+        error.response?.data?.detail ||
+          "AI categorization failed"
+      );
+    } finally {
+      setCategorizing(false);
+    }
+  };
 
   useEffect(() => {
     fetchTransactions();
@@ -149,7 +162,6 @@ function Transactions() {
       setEditingId(null);
 
       await fetchTransactions();
-
     } catch (error) {
       console.error(error);
 
@@ -219,7 +231,6 @@ function Transactions() {
       }
 
       await fetchTransactions();
-
     } catch (error) {
       console.error(error);
 
@@ -238,6 +249,258 @@ function Transactions() {
     ).toLocaleDateString("en-IN");
   };
 
+  // Get unique categories
+  const categories = useMemo(() => {
+    return [
+      ...new Set(
+        transactions
+          .map((transaction) => transaction.category)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [transactions]);
+
+  // Get unique payment methods
+  const paymentMethods = useMemo(() => {
+    return [
+      ...new Set(
+        transactions
+          .map(
+            (transaction) =>
+              transaction.payment_method
+          )
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [transactions]);
+
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    const searchText = search
+      .trim()
+      .toLowerCase();
+
+    const minimumAmount =
+      minAmount === ""
+        ? null
+        : Number(minAmount);
+
+    const maximumAmount =
+      maxAmount === ""
+        ? null
+        : Number(maxAmount);
+
+    const filtered = transactions.filter(
+      (transaction) => {
+        const matchesSearch =
+          !searchText ||
+          [
+            transaction.description,
+            transaction.merchant,
+            transaction.category,
+            transaction.payment_method,
+          ]
+            .filter(Boolean)
+            .some((value) =>
+              value
+                .toLowerCase()
+                .includes(searchText)
+            );
+
+        const matchesType =
+          typeFilter === "all" ||
+          transaction.type === typeFilter;
+
+        const matchesCategory =
+          categoryFilter === "all" ||
+          transaction.category === categoryFilter;
+
+        const matchesPayment =
+          paymentFilter === "all" ||
+          transaction.payment_method === paymentFilter;
+
+        const matchesSource =
+          sourceFilter === "all" ||
+          transaction.source === sourceFilter;
+
+        const matchesFromDate =
+          !fromDate ||
+          transaction.date >= fromDate;
+
+        const matchesToDate =
+          !toDate ||
+          transaction.date <= toDate;
+
+        const amount = Number(
+          transaction.amount || 0
+        );
+
+        const matchesMinAmount =
+          minimumAmount === null ||
+          amount >= minimumAmount;
+
+        const matchesMaxAmount =
+          maximumAmount === null ||
+          amount <= maximumAmount;
+
+        return (
+          matchesSearch &&
+          matchesType &&
+          matchesCategory &&
+          matchesPayment &&
+          matchesSource &&
+          matchesFromDate &&
+          matchesToDate &&
+          matchesMinAmount &&
+          matchesMaxAmount
+        );
+      }
+    );
+
+    return filtered.sort((a, b) => {
+      if (sortBy === "date_desc") {
+        return (
+          new Date(b.date) -
+          new Date(a.date)
+        );
+      }
+
+      if (sortBy === "date_asc") {
+        return (
+          new Date(a.date) -
+          new Date(b.date)
+        );
+      }
+
+      if (sortBy === "amount_desc") {
+        return (
+          Number(b.amount || 0) -
+          Number(a.amount || 0)
+        );
+      }
+
+      if (sortBy === "amount_asc") {
+        return (
+          Number(a.amount || 0) -
+          Number(b.amount || 0)
+        );
+      }
+
+      if (sortBy === "description_asc") {
+        return (
+          (a.description || "")
+            .toLowerCase()
+            .localeCompare(
+              (b.description || "").toLowerCase()
+            )
+        );
+      }
+
+      if (sortBy === "description_desc") {
+          return (
+            (b.description || "")
+              .toLowerCase()
+              .localeCompare(
+                (a.description || "").toLowerCase()
+              )
+          );
+        }
+
+        if (sortBy === "income_first") {
+          if (
+            a.type === "income" &&
+            b.type !== "income"
+          ) {
+            return -1;
+          }
+
+          if (
+            a.type !== "income" &&
+            b.type === "income"
+          ) {
+            return 1;
+          }
+
+          return 0;
+        }
+
+        if (sortBy === "expense_first") {
+          if (
+            a.type === "expense" &&
+            b.type !== "expense"
+          ) {
+            return -1;
+          }
+
+          if (
+            a.type !== "expense" &&
+            b.type === "expense"
+          ) {
+            return 1;
+          }
+
+          return 0;
+        }
+
+        return 0;
+    });
+  }, [
+    transactions,
+    search,
+    typeFilter,
+    categoryFilter,
+    paymentFilter,
+    sourceFilter,
+    fromDate,
+    toDate,
+    minAmount,
+    maxAmount,
+    sortBy,
+  ]);
+
+  const filteredTotals = useMemo(() => {
+    const income = filteredTransactions
+      .filter(
+        (transaction) =>
+          transaction.type === "income"
+      )
+      .reduce(
+        (total, transaction) =>
+          total + Number(transaction.amount || 0),
+        0
+      );
+
+    const expenses = filteredTransactions
+      .filter(
+        (transaction) =>
+          transaction.type === "expense"
+      )
+      .reduce(
+        (total, transaction) =>
+          total + Number(transaction.amount || 0),
+        0
+      );
+
+    return {
+      income,
+      expenses,
+      net: income - expenses,
+    };
+  }, [filteredTransactions]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setTypeFilter("all");
+    setCategoryFilter("all");
+    setPaymentFilter("all");
+    setSourceFilter("all");
+    setFromDate("");
+    setToDate("");
+    setMinAmount("");
+    setMaxAmount("");
+    setSortBy("date_desc");
+  };
+
   return (
     <div className="transactions-page">
 
@@ -252,7 +515,6 @@ function Transactions() {
             Manage your income and expenses
           </p>
         </div>
-
 
       </div>
 
@@ -351,6 +613,7 @@ function Transactions() {
           <div className="form-row">
 
             <div className="form-group">
+
               <label>Category</label>
 
               <select
@@ -413,6 +676,7 @@ function Transactions() {
                   ? "Analyzing..."
                   : "✨ Suggest Category with AI"}
               </button>
+
             </div>
 
             <div className="form-group">
@@ -524,6 +788,80 @@ function Transactions() {
 
       </section>
 
+      <div className="transaction-filter-summary">
+
+        <div className="filter-summary-card income">
+
+          <div className="filter-summary-label">
+            Filtered Income
+          </div>
+
+          <div className="filter-summary-value">
+            +₹
+            {filteredTotals.income.toLocaleString(
+              "en-IN",
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </div>
+
+        </div>
+
+
+        <div className="filter-summary-card expense">
+
+          <div className="filter-summary-label">
+            Filtered Expenses
+          </div>
+
+          <div className="filter-summary-value">
+            -₹
+            {filteredTotals.expenses.toLocaleString(
+              "en-IN",
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </div>
+
+        </div>
+
+
+        <div
+          className={`filter-summary-card ${
+            filteredTotals.net >= 0
+              ? "net-positive"
+              : "net-negative"
+          }`}
+        >
+
+          <div className="filter-summary-label">
+            Net Amount
+          </div>
+
+          <div className="filter-summary-value">
+            {filteredTotals.net >= 0
+              ? "+"
+              : "-"}
+            ₹
+            {Math.abs(
+              filteredTotals.net
+            ).toLocaleString(
+              "en-IN",
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </div>
+
+        </div>
+
+      </div>
+
       {/* Transaction History */}
 
       <section className="transaction-list-card">
@@ -534,10 +872,9 @@ function Transactions() {
             <h2>Transaction History</h2>
 
             <p>
-              {transactions.length} transaction
-              {transactions.length !== 1
-                ? "s"
-                : ""}
+              Showing{" "}
+              {filteredTransactions.length} of{" "}
+              {transactions.length} transactions
             </p>
           </div>
 
@@ -550,7 +887,264 @@ function Transactions() {
 
         </div>
 
+        {/* Filters */}
+
+        <div className="transaction-filters">
+
+          <div className="filter-group search-filter">
+
+            <label>Search</label>
+
+            <input
+              type="text"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Search merchant or description..."
+            />
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Type</label>
+
+            <select
+              value={typeFilter}
+              onChange={(e) =>
+                setTypeFilter(e.target.value)
+              }
+            >
+              <option value="all">
+                All Types
+              </option>
+
+              <option value="income">
+                Income
+              </option>
+
+              <option value="expense">
+                Expense
+              </option>
+
+            </select>
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Category</label>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) =>
+                setCategoryFilter(
+                  e.target.value
+                )
+              }
+            >
+              <option value="all">
+                All Categories
+              </option>
+
+              {categories.map(
+                (category) => (
+                  <option
+                    key={category}
+                    value={category}
+                  >
+                    {category}
+                  </option>
+                )
+              )}
+
+            </select>
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Payment</label>
+
+            <select
+              value={paymentFilter}
+              onChange={(e) =>
+                setPaymentFilter(
+                  e.target.value
+                )
+              }
+            >
+              <option value="all">
+                All Methods
+              </option>
+
+              {paymentMethods.map(
+                (method) => (
+                  <option
+                    key={method}
+                    value={method}
+                  >
+                    {method}
+                  </option>
+                )
+              )}
+
+            </select>
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Source</label>
+
+            <select
+              value={sourceFilter}
+              onChange={(e) =>
+                setSourceFilter(
+                  e.target.value
+                )
+              }
+            >
+              <option value="all">
+                All Sources
+              </option>
+
+              <option value="manual">
+                Manual
+              </option>
+
+              <option value="csv">
+                CSV
+              </option>
+
+              <option value="pdf">
+                PDF
+              </option>
+
+            </select>
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Sort By</label>
+
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value)
+              }
+            >
+              <option value="income_first">
+                Income — First
+              </option>
+
+              <option value="expense_first">
+                Expenses — First
+              </option>
+              
+              <option value="date_desc">
+                Date — Newest First
+              </option>
+
+              <option value="date_asc">
+                Date — Oldest First
+              </option>
+
+              <option value="amount_desc">
+                Amount — Highest First
+              </option>
+
+              <option value="amount_asc">
+                Amount — Lowest First
+              </option>
+
+              <option value="description_asc">
+                Description — A to Z
+              </option>
+
+              <option value="description_desc">
+                Description — Z to A
+              </option>
+            </select>
+
+          </div>
+          
+          <div className="filter-group">
+
+            <label>From Date</label>
+
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) =>
+                setFromDate(e.target.value)
+              }
+            />
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>To Date</label>
+
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) =>
+                setToDate(e.target.value)
+              }
+            />
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Min Amount</label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={minAmount}
+              onChange={(e) =>
+                setMinAmount(e.target.value)
+              }
+              placeholder="₹0"
+            />
+
+          </div>
+
+          <div className="filter-group">
+
+            <label>Max Amount</label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={maxAmount}
+              onChange={(e) =>
+                setMaxAmount(e.target.value)
+              }
+              placeholder="₹0"
+            />
+
+          </div>
+
+          <button
+            type="button"
+            className="clear-filters-button"
+            onClick={clearFilters}
+          >
+            Clear Filters
+          </button>
+
+        </div>
+
         {loading ? (
+
           <div className="transaction-empty">
             <p>Loading transactions...</p>
           </div>
@@ -558,11 +1152,25 @@ function Transactions() {
         ) : transactions.length === 0 ? (
 
           <div className="transaction-empty">
+
             <p>No transactions yet.</p>
 
             <span>
               Add your first income or expense above.
             </span>
+
+          </div>
+
+        ) : filteredTransactions.length === 0 ? (
+
+          <div className="transaction-empty">
+
+            <p>No matching transactions.</p>
+
+            <span>
+              Try changing or clearing the filters.
+            </span>
+
           </div>
 
         ) : (
@@ -579,6 +1187,7 @@ function Transactions() {
                   <th>Category</th>
                   <th>Description</th>
                   <th>Payment</th>
+                  <th>Source</th>
                   <th>Amount</th>
                   <th>Actions</th>
                 </tr>
@@ -587,7 +1196,7 @@ function Transactions() {
 
               <tbody>
 
-                {transactions.map(
+                {filteredTransactions.map(
                   (transaction) => (
 
                     <tr
@@ -626,6 +1235,18 @@ function Transactions() {
                       <td>
                         {transaction.payment_method ||
                           "-"}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`transaction-source ${
+                            transaction.source ||
+                            "manual"
+                          }`}
+                        >
+                          {transaction.source ||
+                            "manual"}
+                        </span>
                       </td>
 
                       <td

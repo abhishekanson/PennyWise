@@ -368,82 +368,74 @@ def parse_amount(text):
 # UPI REFERENCE PARSER
 # =========================================================
 
-def parse_transaction_reference(
-    reference
-):
-    """
-    Example:
-
-    UPI/CR/127369090408/
-    RAHUL KR/HDFC/rahulkrish/UPI
-    """
-
+def parse_transaction_reference(reference):
     result = {
+        "party": None,
         "payment_method": None,
-        "direction": None,
-        "reference_id": None,
-        "party": None
+        "reference_id": None
     }
 
     if not reference:
         return result
 
+    reference = reference.strip()
+
+    # -----------------------------------------------------
+    # Normalize OCR errors before parsing
+    # -----------------------------------------------------
+
+    # OCR may produce:
+    # "_ UPI/CR/..."
+    # "_ UPI/DR/..."
+    #
+    # Convert these to:
+    # "UPI/CR/..."
+    # "UPI/DR/..."
+
+    reference = re.sub(
+        r"^[^A-Za-z0-9]*UPI\s*/",
+        "UPI/",
+        reference,
+        flags=re.IGNORECASE
+    )
+
     parts = [
         part.strip()
         for part in reference.split("/")
-        if part.strip()
-    ]
-
-    upper_parts = [
-        part.upper()
-        for part in parts
     ]
 
     # -----------------------------------------------------
-    # Payment method
+    # UPI transaction
+    #
+    # UPI/CR/REFERENCE/PARTY/BANK/USERNAME/UPI
+    # UPI/DR/REFERENCE/PARTY/BANK/USERNAME/UPI
     # -----------------------------------------------------
 
-    if "UPI" in upper_parts:
+    if (
+        len(parts) >= 4
+        and parts[0].upper() == "UPI"
+        and parts[1].upper() in ["CR", "DR"]
+    ):
 
         result["payment_method"] = "UPI"
 
-    # -----------------------------------------------------
-    # Credit / debit
-    # -----------------------------------------------------
+        result["reference_id"] = parts[2].strip()
 
-    if "CR" in upper_parts:
+        candidate = parts[3].strip()
 
-        result["direction"] = "credit"
+        if candidate not in [
+            "",
+            "_",
+            "-",
+            "—",
+            "–"
+        ]:
+            result["party"] = candidate
 
-    elif "DR" in upper_parts:
-
-        result["direction"] = "debit"
-
-    # -----------------------------------------------------
-    # Reference number
-    # -----------------------------------------------------
-
-    for part in parts:
-
-        if re.fullmatch(
-            r"\d{6,}",
-            part
-        ):
-
-            result[
-                "reference_id"
-            ] = part
-
-            break
+        return result
 
     # -----------------------------------------------------
-    # Person / merchant
-    # -----------------------------------------------------
-
-        # -----------------------------------------------------
-    # Find party/merchant from UPI structure
-    #
-    # UPI/CR/REFERENCE/PARTY/BANK/USERNAME/UPI
+    # General fallback
     # -----------------------------------------------------
 
     excluded = {
@@ -463,59 +455,36 @@ def parse_transaction_reference(
         "BANK"
     }
 
-    if (
-        len(parts) >= 4
-        and parts[0].upper() == "UPI"
-        and parts[1].upper() in ["CR", "DR"]
-    ):
+    for part in parts:
 
-        candidate = parts[3].strip()
+        candidate = part.strip()
+        upper = candidate.upper()
 
-        if candidate and candidate not in [
+        if upper in excluded:
+            continue
+
+        if upper in [
+            "",
             "_",
             "-",
             "—",
             "–"
         ]:
+            continue
 
-            result["party"] = candidate
+        if re.fullmatch(
+            r"\d+",
+            candidate
+        ):
+            continue
 
-    else:
+        if len(candidate) < 3:
+            continue
 
-        # Fallback for non-UPI transactions
-        for part in parts:
-
-            upper = part.upper().strip()
-
-            if upper in excluded:
-                continue
-
-            if upper in [
-                "",
-                "_",
-                "-",
-                "—",
-                "–",
-                "CR",
-                "DR"
-            ]:
-                continue
-
-            if re.fullmatch(
-                r"\d+",
-                part
-            ):
-                continue
-
-            if len(part.strip()) < 3:
-                continue
-
-            result["party"] = part.strip()
-
-            break
+        result["party"] = candidate
+        break
 
     return result
-
 
 # =========================================================
 # EXTRACT TRANSACTION ROW

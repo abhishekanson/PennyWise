@@ -1,330 +1,368 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import API from "../api";
 
 function ImportStatement() {
+  const [importType, setImportType] = useState("pdf");
   const [file, setFile] = useState(null);
 
-  const [fileType, setFileType] = useState("csv");
-
-  const [uploading, setUploading] = useState(false);
-
-  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
+  const [result, setResult] = useState(null);
+  const [transactions, setTransactions] = useState([]);
 
-    setFile(selectedFile || null);
-    setResult(null);
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+
+    setFile(selectedFile);
+    setMessage("");
     setError("");
+    setResult(null);
+    setTransactions([]);
   };
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
-
+  const handleImport = async () => {
     if (!file) {
-      setError(
-        `Please select a ${fileType.toUpperCase()} file.`
-      );
+      setError("Please select a file first.");
       return;
     }
 
-    setUploading(true);
+    setLoading(true);
+    setMessage("");
     setError("");
     setResult(null);
+    setTransactions([]);
 
     try {
       const formData = new FormData();
-
-      formData.append(
-        "file",
-        file
-      );
+      formData.append("file", file);
 
       const endpoint =
-        fileType === "csv"
-          ? "/imports/csv"
-          : "/imports/pdf";
+        importType === "pdf"
+          ? "/imports/pdf"
+          : "/imports/csv";
 
       const response = await API.post(
         endpoint,
-        formData
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
 
       setResult(response.data);
 
+      setMessage(
+        response.data.message ||
+        "Import completed successfully."
+      );
+
+      // Load transactions after import
+      const transactionsResponse =
+        await API.get("/transactions/");
+
+      setTransactions(
+        transactionsResponse.data
+      );
+
       setFile(null);
 
-      e.target.reset();
-
-    } catch (error) {
-      console.error(error);
-
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-
-        window.location.href = "/login";
-      } else {
-        setError(
-          error.response?.data?.detail ||
-          "Failed to import statement"
+      // Reset file input
+      const fileInput =
+        document.getElementById(
+          "statement-file"
         );
+
+      if (fileInput) {
+        fileInput.value = "";
       }
 
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.detail ||
+        "Import failed. Please try again."
+      );
+
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="import-page">
+    <div className="page-container">
 
       <div className="page-header">
-
         <div>
-          <h1>
-            Import Bank Statement
-          </h1>
+          <h1>Import Statement</h1>
 
           <p>
-            Upload a CSV or PDF bank statement
-            to automatically add your transactions.
+            Import transactions from a bank statement
+            using PDF or CSV.
           </p>
         </div>
-
-        <Link
-          to="/transactions"
-          className="back-button"
-        >
-          Transactions
-        </Link>
-
       </div>
 
-
-      {/* File type selection */}
+      {/* Import type selector */}
 
       <div className="import-type-selector">
 
         <button
-          type="button"
           className={
-            fileType === "csv"
+            importType === "pdf"
               ? "import-type-button active"
               : "import-type-button"
           }
           onClick={() => {
-            setFileType("csv");
+            setImportType("pdf");
             setFile(null);
             setResult(null);
             setError("");
-          }}
-        >
-          CSV Statement
-        </button>
-
-        <button
-          type="button"
-          className={
-            fileType === "pdf"
-              ? "import-type-button active"
-              : "import-type-button"
-          }
-          onClick={() => {
-            setFileType("pdf");
-            setFile(null);
-            setResult(null);
-            setError("");
+            setMessage("");
           }}
         >
           PDF Statement
         </button>
 
+        <button
+          className={
+            importType === "csv"
+              ? "import-type-button active"
+              : "import-type-button"
+          }
+          onClick={() => {
+            setImportType("csv");
+            setFile(null);
+            setResult(null);
+            setError("");
+            setMessage("");
+          }}
+        >
+          CSV Statement
+        </button>
+
       </div>
 
+      {/* Upload card */}
 
-      <section className="import-card">
-
-        <div className="import-icon">
-          ↑
-        </div>
+      <div className="import-card">
 
         <h2>
-          Upload {fileType.toUpperCase()} Statement
+          {importType === "pdf"
+            ? "Upload Bank Statement PDF"
+            : "Upload Transaction CSV"}
         </h2>
 
         <p className="import-description">
-          PennyWise will analyze the statement,
-          automatically categorize expenses using AI
-          and detect duplicate transactions.
+          {importType === "pdf"
+            ? "Upload a scanned or digital bank statement. PennyWise will extract transactions using OCR."
+            : "Upload a CSV file containing your transaction records."}
         </p>
 
+        <input
+          id="statement-file"
+          type="file"
+          accept={
+            importType === "pdf"
+              ? ".pdf"
+              : ".csv"
+          }
+          onChange={handleFileChange}
+        />
 
-        <form
-          onSubmit={handleUpload}
-          className="import-form"
-        >
-
-          <div className="file-upload-area">
-
-            <input
-              type="file"
-              accept={
-                fileType === "csv"
-                  ? ".csv"
-                  : ".pdf"
-              }
-              onChange={handleFileChange}
-              id="statement-file"
-            />
-
-            <label htmlFor="statement-file">
-
-              {file
-                ? file.name
-                : `Choose a ${fileType.toUpperCase()} file`}
-
-            </label>
-
-          </div>
-
-
-          <button
-            type="submit"
-            className="import-button"
-            disabled={uploading}
-          >
-
-            {uploading
-              ? "Importing..."
-              : "Import Statement"}
-
-          </button>
-
-        </form>
-
-
-        {error && (
-          <div className="import-error">
-            {error}
+        {file && (
+          <div className="selected-file">
+            <strong>Selected file:</strong>{" "}
+            {file.name}
           </div>
         )}
 
+        <button
+          className="import-button"
+          onClick={handleImport}
+          disabled={loading || !file}
+        >
+          {loading
+            ? "Importing..."
+            : `Import ${importType.toUpperCase()}`}
+        </button>
 
-        {result && (
-          <div className="import-result">
+      </div>
 
-            <h3>
-              Import Completed
-            </h3>
+      {/* Success message */}
 
-            <div className="import-stats">
+      {message && (
+        <div className="import-success">
+          {message}
+        </div>
+      )}
 
-              <div>
-                <strong>
-                  {result.imported ?? 0}
-                </strong>
+      {/* Error message */}
 
-                <span>
-                  Imported
-                </span>
-              </div>
+      {error && (
+        <div className="import-error">
+          {error}
+        </div>
+      )}
 
+      {/* Import result */}
 
-              <div>
-                <strong>
-                  {result.skipped ?? 0}
-                </strong>
+      {result && (
+        <div className="import-result">
 
-                <span>
-                  Duplicates Skipped
-                </span>
-              </div>
+          <h2>Import Summary</h2>
 
+          <div className="import-summary-grid">
 
-              <div>
-                <strong>
-                  {result.errors?.length ?? 0}
-                </strong>
-
-                <span>
-                  Errors
-                </span>
-              </div>
-
+            <div className="import-summary-card">
+              <span>Detected</span>
+              <strong>
+                {result.transactions_detected ?? "-"}
+              </strong>
             </div>
 
+            <div className="import-summary-card">
+              <span>Imported</span>
+              <strong>
+                {result.imported ?? "-"}
+              </strong>
+            </div>
 
-            {result.transactions_detected !==
-              undefined && (
+            <div className="import-summary-card">
+              <span>Skipped</span>
+              <strong>
+                {result.skipped ?? "-"}
+              </strong>
+            </div>
 
-              <p className="transactions-detected">
+            <div className="import-summary-card">
+              <span>Errors</span>
+              <strong>
+                {result.errors?.length ?? 0}
+              </strong>
+            </div>
 
-                Transactions detected:{" "}
-                <strong>
-                  {result.transactions_detected}
-                </strong>
+          </div>
 
-              </p>
+          {result.errors &&
+            result.errors.length > 0 && (
+              <div className="import-errors">
 
-            )}
-
-
-            {result.errors?.length > 0 && (
-
-              <div className="import-error-list">
+                <h3>Import Errors</h3>
 
                 {result.errors.map(
                   (item, index) => (
-
-                    <p key={index}>
+                    <div
+                      key={index}
+                      className="import-error-item"
+                    >
                       Row {item.row}:{" "}
                       {item.error}
-                    </p>
-
+                    </div>
                   )
                 )}
 
               </div>
-
             )}
 
+        </div>
+      )}
+
+      {/* Transactions */}
+
+      {transactions.length > 0 && (
+        <div className="import-transactions">
+
+          <div className="section-header">
+            <h2>Transactions</h2>
+
+            <span className="transactions-detected">
+              {transactions.length} transactions
+            </span>
           </div>
-        )}
 
-      </section>
+          <div className="transaction-table-wrapper">
 
+            <table className="transaction-table">
 
-      <section className="import-info-card">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Merchant</th>
+                  <th>Category</th>
+                  <th>Payment</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
 
-        <h2>
-          Supported Formats
-        </h2>
+              <tbody>
 
-        <p>
-          CSV statements should contain:
-        </p>
+                {transactions.map(
+                  (transaction) => (
+                    <tr key={transaction.id}>
 
-        <div className="csv-columns">
+                      <td>
+                        {transaction.date}
+                      </td>
 
-          <span>date</span>
-          <span>description</span>
-          <span>amount</span>
-          <span>type</span>
-          <span>merchant</span>
-          <span>payment_method</span>
+                      <td>
+                        {transaction.description ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {transaction.merchant ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {transaction.category ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {transaction.payment_method ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        <span
+                          className={
+                            transaction.type ===
+                            "income"
+                              ? "transaction-income"
+                              : "transaction-expense"
+                          }
+                        >
+                          {transaction.type}
+                        </span>
+                      </td>
+
+                      <td>
+                        ₹
+                        {Number(
+                          transaction.amount
+                        ).toFixed(2)}
+                      </td>
+
+                    </tr>
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
 
         </div>
-
-
-        <p>
-          PDF statements must currently be
-          text-based PDFs. Scanned/image-only
-          statements are not supported yet.
-        </p>
-
-      </section>
+      )}
 
     </div>
   );

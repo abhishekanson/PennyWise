@@ -14,22 +14,41 @@ router = APIRouter(
 
 @router.get("/summary")
 def get_financial_summary(
+    month: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    total_income = db.query(
+    income_query = db.query(
         func.coalesce(func.sum(Transaction.amount), 0)
     ).filter(
         Transaction.user_id == current_user.id,
         Transaction.type == "income"
-    ).scalar()
+    )
 
-    total_expenses = db.query(
+    expense_query = db.query(
         func.coalesce(func.sum(Transaction.amount), 0)
     ).filter(
         Transaction.user_id == current_user.id,
         Transaction.type == "expense"
-    ).scalar()
+    )
+
+    if month:
+        income_query = income_query.filter(
+            func.to_char(
+                Transaction.date,
+                "YYYY-MM"
+            ) == month
+        )
+
+        expense_query = expense_query.filter(
+            func.to_char(
+                Transaction.date,
+                "YYYY-MM"
+            ) == month
+        )
+
+    total_income = income_query.scalar()
+    total_expenses = expense_query.scalar()
 
     balance = total_income - total_expenses
 
@@ -39,19 +58,29 @@ def get_financial_summary(
         "balance": balance
     }
 
-
 @router.get("/category-spending")
 def get_category_spending(
+    month: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    results = db.query(
+    query = db.query(
         Transaction.category,
         func.sum(Transaction.amount).label("total")
     ).filter(
         Transaction.user_id == current_user.id,
         Transaction.type == "expense"
-    ).group_by(
+    )
+
+    if month:
+        query = query.filter(
+            func.to_char(
+                Transaction.date,
+                "YYYY-MM"
+            ) == month
+        )
+
+    results = query.group_by(
         Transaction.category
     ).all()
 
@@ -63,22 +92,43 @@ def get_category_spending(
         for category, total in results
     ]
 
-
 @router.get("/monthly-spending")
 def get_monthly_spending(
+    month: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    results = db.query(
-        func.to_char(Transaction.date, "YYYY-MM").label("month"),
-        func.sum(Transaction.amount).label("total")
+    query = db.query(
+        func.to_char(
+            Transaction.date,
+            "YYYY-MM"
+        ).label("month"),
+        func.sum(
+            Transaction.amount
+        ).label("total")
     ).filter(
         Transaction.user_id == current_user.id,
         Transaction.type == "expense"
-    ).group_by(
-        func.to_char(Transaction.date, "YYYY-MM")
+    )
+
+    if month:
+        query = query.filter(
+            func.to_char(
+                Transaction.date,
+                "YYYY-MM"
+            ) == month
+        )
+
+    results = query.group_by(
+        func.to_char(
+            Transaction.date,
+            "YYYY-MM"
+        )
     ).order_by(
-        func.to_char(Transaction.date, "YYYY-MM")
+        func.to_char(
+            Transaction.date,
+            "YYYY-MM"
+        )
     ).all()
 
     return [
@@ -89,33 +139,48 @@ def get_monthly_spending(
         for month, total in results
     ]
 
-
 @router.get("/budget-usage")
 def get_budget_usage(
+    month: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    budgets = db.query(Budget).filter(
+    budgets_query = db.query(Budget).filter(
         Budget.user_id == current_user.id
-    ).all()
+    )
+
+    if month:
+        budgets_query = budgets_query.filter(
+            Budget.month == month
+        )
+
+    budgets = budgets_query.all()
 
     result = []
 
     for budget in budgets:
 
         spent = db.query(
-            func.coalesce(func.sum(Transaction.amount), 0)
+            func.coalesce(
+                func.sum(Transaction.amount),
+                0
+            )
         ).filter(
             Transaction.user_id == current_user.id,
             Transaction.type == "expense",
             Transaction.category == budget.category,
-            func.to_char(Transaction.date, "YYYY-MM") == budget.month
+            func.to_char(
+                Transaction.date,
+                "YYYY-MM"
+            ) == budget.month
         ).scalar()
 
         remaining = budget.amount - spent
 
         if budget.amount > 0:
-            percentage_used = (spent / budget.amount) * 100
+            percentage_used = (
+                spent / budget.amount
+            ) * 100
         else:
             percentage_used = 0
 
@@ -126,11 +191,13 @@ def get_budget_usage(
             "budget_amount": budget.amount,
             "spent": spent,
             "remaining": remaining,
-            "percentage_used": round(percentage_used, 2)
+            "percentage_used": round(
+                percentage_used,
+                2
+            )
         })
 
     return result
-
 
 @router.get("/savings-progress")
 def get_savings_progress(

@@ -491,24 +491,19 @@ async def import_pdf(
             # STEP 5 — DUPLICATE DETECTION
             # =================================================
 
-            existing = db.query(
-                Transaction
-            ).filter(
-                Transaction.user_id ==
-                current_user.id,
-
-                Transaction.amount ==
-                amount,
-
-                Transaction.type ==
-                transaction_type,
-
-                Transaction.date ==
-                date_value,
-
-                Transaction.description ==
-                description
-            ).first()
+            if reference_id:
+                existing = db.query(Transaction).filter(
+                    Transaction.user_id == current_user.id,
+                    Transaction.reference_id == reference_id
+                ).first()
+            else:
+                existing = db.query(Transaction).filter(
+                    Transaction.user_id == current_user.id,
+                    Transaction.amount == amount,
+                    Transaction.type == transaction_type,
+                    Transaction.date == date_value,
+                    Transaction.description == description
+                ).first()
 
             if existing:
 

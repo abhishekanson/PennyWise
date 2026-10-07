@@ -71,6 +71,22 @@ function Sidebar() {
           <span>Savings Goals</span>
         </NavLink>
 
+        <NavLink
+          to="/reports"
+          className={navClass}
+        >
+          <span className="sidebar-icon">▤</span>
+          <span>Reports</span>
+        </NavLink>
+
+        <NavLink
+          to="/analytics"
+          className={navClass}
+        >
+          <span className="sidebar-icon">◈</span>
+          <span>Analytics</span>
+        </NavLink>
+
       </nav>
 
       <div className="sidebar-bottom">

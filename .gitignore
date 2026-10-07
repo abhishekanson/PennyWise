@@ -23,3 +23,9 @@ Thumbs.db
 
 # Uploaded/generated files
 uploads/
+*.pdf
+*.csv
+
+# Database
+*.db
+

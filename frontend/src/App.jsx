@@ -11,6 +11,9 @@ import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
 import SavingsGoals from "./pages/SavingsGoals";
 import ImportStatement from "./pages/ImportStatement";
+import Reports from "./pages/Reports";
+import Analytics from "./pages/Analytics";
+
 
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -53,6 +56,14 @@ function App() {
             <Route
               path="/import-statement"
               element={<ImportStatement />}
+            />
+            <Route
+              path="/reports"
+              element={<Reports />}
+            />
+            <Route
+              path="/analytics"
+              element={<Analytics />}
             />
 
           </Route>
