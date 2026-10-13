@@ -235,6 +235,12 @@ function Dashboard() {
     },
   ];
 
+  const categoryBehaviourData = spendingBehaviour?.category_behavior || [];
+
+  const topMerchantsData = spendingBehaviour?.top_merchants || [];
+
+  const behaviourSummary = spendingBehaviour?.behaviour_summary || "";
+
   const formatDate = (date) => {
     if (!date) return "";
 
@@ -243,19 +249,14 @@ function Dashboard() {
     ).toLocaleDateString("en-IN");
   };
 
+  
   const getTrendLabel = (trend) => {
-    if (!trend) return "No data";
-
-    if (trend === "increasing") {
-      return "Increasing";
-    }
-
-    if (trend === "decreasing") {
-      return "Decreasing";
-    }
-
-    return "Stable";
+    if (trend === "increasing") return "Increasing";
+    if (trend === "decreasing") return "Decreasing";
+    if (trend === "stable") return "Stable";
+    return "Insufficient data";
   };
+
 
   return (
     <div className="dashboard">
@@ -615,6 +616,189 @@ function Dashboard() {
 
             </BarChart>
           </ResponsiveContainer>
+
+        </div>
+
+        <div className="behaviour-chart-card">
+
+          <div className="behaviour-chart-header">
+            <div>
+              <h3>Category Behaviour</h3>
+              <p>
+                How your spending categories changed compared with the previous month.
+              </p>
+            </div>
+          </div>
+
+          {categoryBehaviourData.length > 0 ? (
+
+            <div className="category-behaviour-list">
+
+              {categoryBehaviourData.map((item) => (
+
+                <div
+                  className="category-behaviour-row"
+                  key={item.category}
+                >
+
+                  <div className="category-behaviour-info">
+
+                    <div className="category-behaviour-name">
+                      {item.category}
+                    </div>
+
+                    <div className="category-behaviour-amount">
+                      ₹{Number(item.total_spending || 0).toLocaleString("en-IN")}
+                    </div>
+
+                  </div>
+
+                  <div className="category-behaviour-change">
+
+                    <span
+                      className={
+                        item.trend === "increasing"
+                          ? "behaviour-trend increasing"
+                          : item.trend === "decreasing"
+                          ? "behaviour-trend decreasing"
+                          : "behaviour-trend stable"
+                      }
+                    >
+                      {item.trend === "increasing"
+                        ? "↑ Increasing"
+                        : item.trend === "decreasing"
+                        ? "↓ Decreasing"
+                        : "→ Stable"}
+                    </span>
+
+                    <span className="category-change-percent">
+                      {Number(item.transaction_count || 0) > 0
+                        ? "+"
+                        : ""}
+                      {Number(item.transaction_count || 0).toFixed(1)} transactions
+                    </span>
+
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          ) : (
+
+            <div className="behaviour-no-data">
+              Not enough category data available.
+            </div>
+
+          )}
+
+        </div>
+
+        <div className="behaviour-chart-card">
+
+          <div className="behaviour-chart-header">
+            <div>
+              <h3>Top Merchants</h3>
+              <p>
+                Merchants where you spent the most during the analysis period.
+              </p>
+            </div>
+          </div>
+
+          {topMerchantsData.length > 0 ? (
+
+            <div className="top-merchants-list">
+
+              {topMerchantsData.map((item, index) => (
+
+                <div
+                  className="top-merchant-row"
+                  key={`${item.merchant}-${index}`}
+                >
+
+                  <div className="top-merchant-rank">
+                    {index + 1}
+                  </div>
+
+                  <div className="top-merchant-info">
+
+                    <div className="top-merchant-name">
+                      {item.merchant}
+                    </div>
+
+                    <div className="top-merchant-count">
+                      {Number(item.transaction_count || 0)} transactions
+                    </div>
+
+                  </div>
+
+                  <div className="top-merchant-amount">
+                    ₹
+                    {Number(
+                      item.total_spending || 0
+                    ).toLocaleString("en-IN")}
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          ) : (
+
+            <div className="behaviour-no-data">
+              No merchant spending data available.
+            </div>
+
+          )}
+
+        </div>
+
+        <div className="behaviour-summary-card">
+
+          <div className="behaviour-summary-header">
+            <div className="behaviour-summary-icon">
+              ✦
+            </div>
+
+            <div>
+              <h3>Spending Behaviour Summary</h3>
+              <p>
+                A summary of your recent spending patterns.
+              </p>
+            </div>
+          </div>
+
+          
+          
+          <div className="behaviour-summary-list">
+            {Array.isArray(behaviourSummary) &&
+            behaviourSummary.length > 0 ? (
+              behaviourSummary.map((item, index) => (
+                <div
+                  className={`behaviour-summary-item ${item.type || "info"}`}
+                  key={`${item.title}-${index}`}
+                >
+                  <div className="behaviour-summary-item-title">
+                    {item.title}
+                  </div>
+
+                  <div className="behaviour-summary-item-message">
+                    {item.message}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>
+                Not enough spending data available to generate a summary.
+              </p>
+            )}
+          </div>
+
+
 
         </div>
 

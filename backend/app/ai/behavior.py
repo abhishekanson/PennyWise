@@ -119,27 +119,136 @@ def analyze_spending_behavior(
             )
         })
 
+
+
     # ---------------------------------------------------------
-    # 4. Detect monthly spending direction
+    # 4. Detect spending direction using equivalent periods
     # ---------------------------------------------------------
 
-    trend = "stable"
+    import calendar
 
-    if len(monthly) >= 2:
+    trend = "insufficient_data"
 
-        first_half = monthly.iloc[
-            : max(1, len(monthly) // 2)
-        ]["amount"].mean()
+    trend_details = {
+        "comparison": "equivalent_period",
+        "current_period_spending": 0.0,
+        "previous_period_spending": 0.0,
+        "current_daily_average": 0.0,
+        "previous_daily_average": 0.0,
+        "change_percent": None,
+        "days_compared": 0,
+    }
 
-        second_half = monthly.iloc[
-            len(monthly) // 2:
-        ]["amount"].mean()
+    today = date.today()
 
-        if second_half > first_half * 1.10:
+    # Current month: day 1 through today
+    current_start = today.replace(day=1)
+    current_end = today
+
+    # Previous month, through the equivalent calendar day
+    if today.month == 1:
+        previous_year = today.year - 1
+        previous_month_number = 12
+    else:
+        previous_year = today.year
+        previous_month_number = today.month - 1
+
+    previous_last_day = calendar.monthrange(
+        previous_year, previous_month_number
+    )[1]
+
+    previous_end = date(
+        previous_year,
+        previous_month_number,
+        min(today.day, previous_last_day),
+    )
+
+    previous_start = previous_end.replace(day=1)
+
+    current_days = (
+        current_end - current_start
+    ).days + 1
+
+    previous_days = (
+        previous_end - previous_start
+    ).days + 1
+
+    trend_details["days_compared"] = current_days
+
+    # df["date"] is already a pandas datetime column
+    comparison_df = df.copy()
+    comparison_df["calendar_date"] = (
+        comparison_df["date"].dt.date
+    )
+
+    current_df = comparison_df[
+        (comparison_df["calendar_date"] >= current_start)
+        & (comparison_df["calendar_date"] <= current_end)
+    ]
+
+    previous_df = comparison_df[
+        (comparison_df["calendar_date"] >= previous_start)
+        & (comparison_df["calendar_date"] <= previous_end)
+    ]
+
+
+    print("Today:", today)
+    print("Current period:", current_start, "to", current_end)
+    print("Previous period:", previous_start, "to", previous_end)
+
+    print("Date range in dataframe:")
+    print(comparison_df["calendar_date"].min())
+    print(comparison_df["calendar_date"].max())
+
+    print("Current-period transactions:", len(current_df))
+    print("Previous-period transactions:", len(previous_df))
+
+    print("Current-period records:")
+    print(current_df[["date", "amount"]].to_string(index=False))
+
+    print("Previous-period records:")
+    print(previous_df[["date", "amount"]].to_string(index=False))
+
+
+
+
+    if not current_df.empty and not previous_df.empty:
+
+        current_total = float(current_df["amount"].sum())
+        previous_total = float(previous_df["amount"].sum())
+
+        current_average = current_total / current_days
+        previous_average = previous_total / previous_days
+
+        trend_details.update({
+            "current_period_spending": round(current_total, 2),
+            "previous_period_spending": round(previous_total, 2),
+            "current_daily_average": round(current_average, 2),
+            "previous_daily_average": round(previous_average, 2),
+        })
+
+        if previous_average > 0:
+
+            change_percent = (
+                (current_average - previous_average)
+                / previous_average
+            ) * 100
+
+            trend_details["change_percent"] = round(
+                change_percent, 2
+            )
+
+            if change_percent > 10:
+                trend = "increasing"
+            elif change_percent < -10:
+                trend = "decreasing"
+            else:
+                trend = "stable"
+
+        elif current_average > 0:
             trend = "increasing"
-
-        elif second_half < first_half * 0.90:
-            trend = "decreasing"
+        else:
+            trend = "stable"
 
     # ---------------------------------------------------------
     # 5. Category behaviour
@@ -426,29 +535,52 @@ def analyze_spending_behavior(
 
     behaviour_summary = []
 
+
     # Overall spending trend
 
     if trend == "increasing":
-
         behaviour_summary.append({
             "type": "warning",
             "title": "Spending is increasing",
             "message": (
-                "Your average spending in recent "
-                "months is higher than earlier months."
+                f"Your average daily spending increased by "
+                f"{trend_details['change_percent']:.1f}% "
+                "compared with the equivalent period last month."
             )
         })
 
     elif trend == "decreasing":
-
         behaviour_summary.append({
             "type": "positive",
             "title": "Spending is decreasing",
             "message": (
-                "Your recent average spending is "
-                "lower than earlier months."
+                f"Your average daily spending decreased by "
+                f"{abs(trend_details['change_percent']):.1f}% "
+                "compared with the equivalent period last month."
             )
         })
+
+    elif trend == "stable":
+        behaviour_summary.append({
+            "type": "positive",
+            "title": "Spending is stable",
+            "message": (
+                "Your average daily spending has remained "
+                "relatively stable compared with the equivalent "
+                "period last month."
+            )
+        })
+
+    else:
+        behaviour_summary.append({
+            "type": "info",
+            "title": "Trend needs more data",
+            "message": (
+                "There is not enough recorded spending in both "
+                "comparison periods to calculate a reliable trend."
+            )
+        })
+
 
     # Highest spending category
 
@@ -526,6 +658,8 @@ def analyze_spending_behavior(
         "transactions_analyzed": len(df),
 
         "overall_trend": trend,
+
+        "trend_details": trend_details,
 
         "monthly_trend": monthly_trend,
 
