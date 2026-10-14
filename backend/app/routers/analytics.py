@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models import User, Transaction
+from ..ai.transaction_filters import is_financial_transaction
 
 
 router = APIRouter(
@@ -88,7 +89,13 @@ def get_advanced_analytics(
         )
         .order_by(Transaction.date.asc())
         .all()
+        
     )
+    transactions = [
+        transaction
+        for transaction in transactions
+        if is_financial_transaction(transaction)
+    ]
 
     # ---------------------------------------------
     # Previous month transactions
@@ -102,7 +109,13 @@ def get_advanced_analytics(
             Transaction.date < previous_end
         )
         .all()
+        
     )
+    previous_transactions = [
+        transaction
+        for transaction in previous_transactions
+        if is_financial_transaction(transaction)
+    ]
 
     # ---------------------------------------------
     # Current month income / expenses

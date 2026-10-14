@@ -5,6 +5,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import SignUp from "./pages/SignUp";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
@@ -22,6 +23,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+
+        <Route 
+          path="/signup" 
+          element={<SignUp />} />
 
         {/* Public Route */}
         <Route

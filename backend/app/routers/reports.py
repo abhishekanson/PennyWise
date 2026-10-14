@@ -6,6 +6,7 @@ from ..database import get_db
 from ..dependencies import get_current_user
 from ..models import User, Transaction, Budget
 from ..ai.financial_health import calculate_financial_health
+from ..ai.transaction_filters import is_financial_transaction
 
 router = APIRouter(
     prefix="/reports",
@@ -72,6 +73,11 @@ def get_monthly_report(
         )
         .all()
     )
+    transactions = [
+        transaction
+        for transaction in transactions
+        if is_financial_transaction(transaction)
+    ]
 
     # ---------------------------------------------
     # Calculate income and expenses

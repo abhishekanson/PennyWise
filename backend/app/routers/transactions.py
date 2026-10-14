@@ -5,6 +5,7 @@ from ..database import get_db
 from ..models import Transaction, User
 from ..schemas import TransactionCreate, TransactionResponse
 from ..dependencies import get_current_user
+from ..ai.transaction_rules import get_transfer_category
 
 
 router = APIRouter(
@@ -41,7 +42,14 @@ def create_transaction(
         type=transaction.type,
         description=transaction.description,
         merchant=transaction.merchant,
-        category=transaction.category,
+        category=(
+            get_transfer_category(
+                description=transaction.description,
+                merchant=transaction.merchant,
+                existing_category=transaction.category
+            )
+            or transaction.category
+        ),
         date=transaction.date,
         payment_method=transaction.payment_method,
         source=transaction.source,
@@ -132,7 +140,14 @@ def update_transaction(
     transaction.type = transaction_data.type
     transaction.description = transaction_data.description
     transaction.merchant = transaction_data.merchant
-    transaction.category = transaction_data.category
+    transaction.category = (
+        get_transfer_category(
+            description=transaction_data.description,
+            merchant=transaction_data.merchant,
+            existing_category=transaction_data.category
+        )
+        or transaction_data.category
+    )
     transaction.date = transaction_data.date
     transaction.payment_method = transaction_data.payment_method
     transaction.source = transaction_data.source

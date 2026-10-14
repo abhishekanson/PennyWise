@@ -27,6 +27,7 @@ function Dashboard() {
   const [financialInsights, setFinancialInsights] = useState([]);
   const [healthScore, setHealthScore] = useState(null);
   const [spendingBehaviour, setSpendingBehaviour] = useState(null);
+  const [futurePrediction, setFuturePrediction] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(
   new Date().toISOString().slice(0, 7)
 );
@@ -83,6 +84,7 @@ function Dashboard() {
           insightsResponse,
           healthResponse,
           behaviourResponse,
+          predictionResponse,
         ] = await Promise.all([
           API.get(
             `/analysis/summary?month=${selectedMonth}`
@@ -104,6 +106,16 @@ function Dashboard() {
           API.get(`/ai/insights?month=${selectedMonth}`),
           API.get(`/ai/health-score?month=${selectedMonth}`),
           API.get("/ai/spending-behaviour?months=6"),
+          API.get("/predictions/future-expenses").catch(
+            (predictionError) => {
+              console.error(
+                "Failed to load future expense prediction:",
+                predictionError
+              );
+
+              return { data: null };
+            }
+          ),
         ]);
 
         setSummary(summaryResponse.data);
@@ -141,6 +153,10 @@ function Dashboard() {
 
         setSpendingBehaviour(
           behaviourResponse.data || null
+        );
+
+        setFuturePrediction(
+          predictionResponse.data || null
         );
 
       } catch (error) {
@@ -240,6 +256,29 @@ function Dashboard() {
   const topMerchantsData = spendingBehaviour?.top_merchants || [];
 
   const behaviourSummary = spendingBehaviour?.behaviour_summary || "";
+
+  const predictionCategories = Array.isArray(
+    futurePrediction?.categories
+  )
+    ? futurePrediction.categories
+    : [];
+
+  const predictedTotal = Number(
+    futurePrediction?.predicted_total || 0
+  );
+
+  const largestPredictedCategory = Math.max(
+    ...predictionCategories.map((item) =>
+      Number(item.predicted_amount || 0)
+    ),
+    0
+  );
+
+  const formatRupees = (amount) =>
+    `₹${Number(amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
   const formatDate = (date) => {
     if (!date) return "";
@@ -474,6 +513,153 @@ function Dashboard() {
           </div>
 
         </div>
+
+      </section>
+
+      {/* Future Expense Prediction */}
+
+      <section className="dashboard-section prediction-section">
+
+        <div className="section-header">
+          <div>
+            <h2>Future Expense Prediction</h2>
+            <p>
+              AI-powered estimates based on your recent spending history.
+            </p>
+          </div>
+
+          <div className="prediction-header-icon">
+            ✦
+          </div>
+        </div>
+
+        {futurePrediction?.status === "success" ? (
+
+          <>
+            <div className="prediction-total-card">
+              <div className="prediction-total-label">
+                Estimated Expenses for Next Month
+              </div>
+
+              <div className="prediction-total-amount">
+                {formatRupees(predictedTotal)}
+              </div>
+
+              <p className="prediction-total-description">
+                Based on the latest three calendar months of recorded
+                expenses. Actual expenses may vary.
+              </p>
+            </div>
+
+            <div className="prediction-breakdown-header">
+              <h3>Predicted Spending by Category</h3>
+              <span>
+                {futurePrediction.months_analyzed || 0} months analyzed
+              </span>
+            </div>
+
+            {predictionCategories.length > 0 ? (
+
+              <div className="prediction-category-list">
+
+                {predictionCategories.map((item) => {
+
+                  const amount = Number(
+                    item.predicted_amount || 0
+                  );
+
+                  const percentage =
+                    largestPredictedCategory > 0
+                      ? (amount / largestPredictedCategory) * 100
+                      : 0;
+
+                  const confidence = (
+                    item.confidence || "Low"
+                  ).toLowerCase();
+
+                  return (
+                    <div
+                      className="prediction-category"
+                      key={item.category}
+                    >
+
+                      <div className="prediction-category-top">
+
+                        <div className="prediction-category-name">
+                          {item.category}
+                        </div>
+
+                        <div className="prediction-category-amount">
+                          {formatRupees(amount)}
+                        </div>
+
+                      </div>
+
+                      <div className="prediction-progress-track">
+                        <div
+                          className="prediction-progress-fill"
+                          style={{
+                            width: `${percentage}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="prediction-category-footer">
+
+                        <span>
+                          Spending recorded in{" "}
+                          {item.months_with_spending} of{" "}
+                          {item.months_included} months
+                        </span>
+
+                        <span
+                          className={`prediction-confidence ${confidence}`}
+                        >
+                          {item.confidence || "Low"} confidence
+                        </span>
+
+                      </div>
+
+                    </div>
+                  );
+                })}
+
+              </div>
+
+            ) : (
+
+              <div className="empty-state">
+                No category predictions are available yet.
+              </div>
+
+            )}
+
+            <div className="prediction-disclaimer">
+              <strong>Note:</strong> These are estimates, not guaranteed
+              expenses. Confidence reflects how consistently spending
+              appeared in the analyzed months.
+            </div>
+          </>
+
+        ) : (
+
+          <div className="prediction-empty-state">
+            <div className="prediction-empty-icon">↗</div>
+
+            <h3>
+              {futurePrediction?.status === "insufficient_data"
+                ? "Not enough spending history"
+                : "Prediction currently unavailable"}
+            </h3>
+
+            <p>
+              {futurePrediction?.message ||
+                "Add or import expense transactions to generate a future expense estimate."}
+            </p>
+
+          </div>
+
+        )}
 
       </section>
 

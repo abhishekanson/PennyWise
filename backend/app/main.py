@@ -13,7 +13,8 @@ from .routers import (
     imports,
     insights,
     reports,
-    analytics
+    analytics,
+    predictions
 )
 
 Base.metadata.create_all(bind=engine)
@@ -42,6 +43,7 @@ app.include_router(imports.router)
 app.include_router(insights.router)
 app.include_router(reports.router)
 app.include_router(analytics.router)
+app.include_router(predictions.router)
 
 
 @app.get("/")

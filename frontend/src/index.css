@@ -3408,3 +3408,179 @@ body {
   line-height: 1.6;
 }
 
+/* Future Expense Prediction */
+
+.prediction-section {
+  overflow: hidden;
+}
+
+.prediction-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--card-bg, #f0f4ff);
+  color: var(--primary-color, #4f46e5);
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.prediction-total-card {
+  margin: 20px 0 28px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--prediction-bg, #f0f4ff);
+}
+
+.prediction-total-label {
+  font-size: 14px;
+  color: var(--text-secondary, #5b6475);
+  margin-bottom: 10px;
+}
+
+.prediction-total-amount {
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 750;
+  letter-spacing: -1px;
+  color: var(--primary-color, #4f46e5);
+  overflow-wrap: anywhere;
+}
+
+.prediction-total-description {
+  margin: 12px 0 0;
+  color: var(--text-secondary, #5b6475);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.prediction-breakdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.prediction-breakdown-header h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.prediction-breakdown-header span {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.prediction-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.prediction-category-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.prediction-category-name {
+  font-weight: 600;
+}
+
+.prediction-category-amount {
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.prediction-progress-track {
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-color, #e5e7eb);
+}
+
+.prediction-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary-color, #4f46e5);
+  transition: width 0.3s ease;
+}
+
+.prediction-category-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.prediction-confidence {
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.prediction-confidence.high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.prediction-confidence.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.prediction-confidence.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.prediction-disclaimer {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary, #6b7280);
+}
+
+.prediction-empty-state {
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.prediction-empty-icon {
+  font-size: 34px;
+  margin-bottom: 12px;
+}
+
+.prediction-empty-state h3 {
+  margin-bottom: 8px;
+}
+
+.prediction-empty-state p {
+  max-width: 520px;
+  margin: 0 auto;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .prediction-total-card {
+    padding: 18px;
+  }
+
+  .prediction-category-footer {
+    align-items: flex-start;
+  }
+}

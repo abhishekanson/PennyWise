@@ -490,41 +490,27 @@ def parse_transaction_reference(reference):
 # EXTRACT TRANSACTION ROW
 # =========================================================
 
+
 def parse_transaction_row(row, columns=None):
     """
-    Parse an SBI transaction row.
+    Parse a transaction row from an SBI-style statement.
 
-    Actual OCR format:
+    Expected row layout:
+    DATE DESCRIPTION CREDIT DEBIT BALANCE
 
-    DATE
-    TRANSACTION REFERENCE
-    -
-    CREDIT
-    DEBIT
-    BALANCE
-
-    Example:
-
-    04-08-26 UPI/CR/127369090408/RAHUL KR/HDFC/
-    rahulkrish/UPI - 9.00 0 11.40
+    The description may contain UPI, NEFT, IMPS, ATM,
+    card payments, bank charges, or other narration text.
     """
 
     if not row:
         return None
-
-    # -----------------------------------------------------
-    # 1. Get complete OCR row text
-    # -----------------------------------------------------
 
     text = row_text(row).strip()
 
     if not text:
         return None
 
-    # -----------------------------------------------------
-    # 2. Find date at beginning of row
-    # -----------------------------------------------------
-
+    # 1. Find a date at the beginning of the row.
     date_match = re.match(
         r"^(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\s+(.+)$",
         text
@@ -533,145 +519,116 @@ def parse_transaction_row(row, columns=None):
     if not date_match:
         return None
 
-    date_text = date_match.group(1)
+    date = parse_date(date_match.group(1))
     remaining = date_match.group(2).strip()
 
-    date = parse_date(date_text)
-
-    if not date:
+    if date is None or not remaining:
         return None
 
-    # -----------------------------------------------------
-    # 3. Ignore non-transaction lines
-    # -----------------------------------------------------
-
-    if not (
-        "/CR/" in remaining.upper()
-        or "/DR/" in remaining.upper()
-    ):
-        return None
-
-    # -----------------------------------------------------
-    # 4. Extract credit/debit/balance from the end
+    # 2. Extract the final three numeric values:
+    #    credit, debit, balance.
     #
-    # Expected:
-    #
-    # reference - credit debit balance
-    #
-    # Example:
-    #
-    # UPI/CR/.../UPI - 9.00 0 11.40
-    # -----------------------------------------------------
-
-    amount_pattern = (
-        r"(.+?)"
-        r"\s+[-=]?\s*"
-        r"([\d,]+(?:\.\d{1,2})?)"
-        r"\s+"
-        r"([\d,]+(?:\.\d{1,2})?)"
-        r"\s+"
-        r"([\d,]+(?:\.\d{1,2})?)"
-        r"\s*$"
+    # Do not require /CR/ or /DR/ in the description.
+    amount_pattern = re.compile(
+        r"^(.*?)\s+"
+        r"([-+]?\s*[\d,]+(?:\.\d{1,2})?)\s+"
+        r"([-+]?\s*[\d,]+(?:\.\d{1,2})?)\s+"
+        r"([-+]?\s*[\d,]+(?:\.\d{1,2})?)\s*$"
     )
 
-    amount_match = re.match(
-        amount_pattern,
-        remaining
-    )
-
-    if not amount_match:
-
-        # Try OCR where separator may be missing
-        amount_pattern_alt = (
-            r"(.+?)"
-            r"\s+"
-            r"([\d,]+(?:\.\d{1,2})?)"
-            r"\s+"
-            r"([\d,]+(?:\.\d{1,2})?)"
-            r"\s+"
-            r"([\d,]+(?:\.\d{1,2})?)"
-            r"\s*$"
-        )
-
-        amount_match = re.match(
-            amount_pattern_alt,
-            remaining
-        )
+    amount_match = amount_pattern.match(remaining)
 
     if not amount_match:
         return None
 
-    reference = amount_match.group(1).strip()
+    description_text = amount_match.group(1).strip()
 
-    credit_text = amount_match.group(2)
-    debit_text = amount_match.group(3)
-    balance_text = amount_match.group(4)
-
-    credit = parse_amount(credit_text)
-    debit = parse_amount(debit_text)
-    balance = parse_amount(balance_text)
-
-    if credit is None or debit is None:
+    if not description_text:
         return None
 
-    # -----------------------------------------------------
-    # 5. Determine transaction type
-    # -----------------------------------------------------
+    credit = parse_amount(amount_match.group(2))
+    debit = parse_amount(amount_match.group(3))
+    balance = parse_amount(amount_match.group(4))
 
-    if debit > 0:
+    if credit is None or debit is None or balance is None:
+        return None
 
+    # 3. Determine income or expense from the amount columns.
+    #    Reject ambiguous rows rather than guessing.
+    if debit > 0 and credit == 0:
         amount = debit
         transaction_type = "expense"
 
-    elif credit > 0:
-
+    elif credit > 0 and debit == 0:
         amount = credit
         transaction_type = "income"
 
     else:
-
-        # No actual transaction amount
+        # Both zero, or both positive: not safe to infer.
         return None
 
-    # -----------------------------------------------------
-    # 6. Parse UPI/reference information
-    # -----------------------------------------------------
-
+    # 4. Parse UPI details when present.
     reference_info = parse_transaction_reference(
-        reference
+        description_text
     )
 
-    payment_method = (
-        reference_info["payment_method"]
+    is_upi = (
+        reference_info.get("payment_method") == "UPI"
     )
 
-    party = reference_info["party"]
-
-    parsed_reference_id = (
-        reference_info["reference_id"]
+    party = (
+        reference_info.get("party")
+        if is_upi
+        else None
     )
 
-    # -----------------------------------------------------
-    # 7. Extract reference number
-    # -----------------------------------------------------
+    reference_id = (
+        reference_info.get("reference_id")
+        if is_upi
+        else None
+    )
 
-    reference_id = parsed_reference_id
+    # 5. Identify other payment methods from narration.
+    upper_description = description_text.upper()
 
-    # -----------------------------------------------------
-    # 8. Build description
-    # -----------------------------------------------------
+    if is_upi:
+        payment_method = "UPI"
 
-    description = reference
+    elif re.search(r"\bNEFT\b", upper_description):
+        payment_method = "NEFT"
 
-    if party:
+    elif re.search(r"\bIMPS\b", upper_description):
+        payment_method = "IMPS"
 
-        description = (
-            f"{party} - {reference}"
-        )
+    elif re.search(r"\bRTGS\b", upper_description):
+        payment_method = "RTGS"
 
-    # -----------------------------------------------------
-    # 9. Return transaction
-    # -----------------------------------------------------
+    elif re.search(
+        r"\bATM\b|\bCASH WITHDRAWAL\b",
+        upper_description
+    ):
+        payment_method = "ATM"
+
+    elif re.search(
+        r"\bPOS\b|\bPURCHASE\b|\bCARD\b",
+        upper_description
+    ):
+        payment_method = "Card"
+
+    elif re.search(
+        r"\bCASH DEPOSIT\b|\bCASH DEP\b",
+        upper_description
+    ):
+        payment_method = "Cash"
+
+    else:
+        payment_method = "Bank"
+
+    # 6. Preserve the original narration for non-UPI rows.
+    description = description_text
+
+    if is_upi and party:
+        description = f"{party} - {description_text}"
 
     return {
         "date": date,
@@ -683,6 +640,7 @@ def parse_transaction_row(row, columns=None):
         "payment_method": payment_method,
         "balance": balance
     }
+
 
 # =========================================================
 # PARSE COMPLETE STATEMENT

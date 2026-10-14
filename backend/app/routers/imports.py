@@ -16,6 +16,8 @@ from ..database import get_db
 from ..models import Transaction, User
 from ..dependencies import get_current_user
 from ..ai.categorizer import predict_category
+from ..ai.transaction_rules import get_transfer_category
+from ..ai.categorizer import predict_category, is_cash_deposit,is_transfer
 
 from ..ocr.pdf_ocr import (
     ocr_pdf,
@@ -202,35 +204,26 @@ async def import_csv(
                         payment_value
                     )
 
+
             # -------------------------------------------------
-            # AI categorization
+            # Categorization
             # -------------------------------------------------
 
-            category = None
+            ai_text = " ".join(filter(None, [description, merchant]))
 
-            if transaction_type == "expense":
+            if is_transfer(ai_text):
+                category = "Transfers"
 
-                ai_text = " ".join(
-                    filter(
-                        None,
-                        [
-                            description,
-                            merchant
-                        ]
-                    )
-                )
+            elif is_cash_deposit(ai_text):
+                category = "Cash Deposit"
+                transaction_type = "income"
 
-                if ai_text:
+            elif transaction_type == "expense" and ai_text:
+                ai_result = predict_category(ai_text)
+                category = str(ai_result["category"])
 
-                    ai_result = (
-                        predict_category(
-                            ai_text
-                        )
-                    )
-
-                    category = (
-                        ai_result["category"]
-                    )
+            else:
+                category = None
 
             # -------------------------------------------------
             # Duplicate detection
@@ -457,36 +450,26 @@ async def import_pdf(
                     "Invalid transaction type."
                 )
 
+
             # =================================================
-            # STEP 4 — AI CATEGORY
+            # STEP 4 — CATEGORIZATION
             # =================================================
 
-            category = None
+            ai_text = " ".join(filter(None, [description, merchant]))
 
-            if transaction_type == "expense":
+            if is_transfer(ai_text):
+                category = "Transfers"
 
-                ai_text = " ".join(
-                    filter(
-                        None,
-                        [
-                            description,
-                            merchant
-                        ]
-                    )
-                )
+            elif is_cash_deposit(ai_text):
+                category = "Cash Deposit"
+                transaction_type = "income"
 
-                if ai_text:
+            elif transaction_type == "expense" and ai_text:
+                ai_result = predict_category(ai_text)
+                category = str(ai_result["category"])
 
-                    ai_result = (
-                        predict_category(
-                            ai_text
-                        )
-                    )
-
-                    category = (
-                        ai_result["category"]
-                    )
-
+            else:
+                category = None
             # =================================================
             # STEP 5 — DUPLICATE DETECTION
             # =================================================
